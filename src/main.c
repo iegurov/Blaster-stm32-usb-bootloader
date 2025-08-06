@@ -1,70 +1,57 @@
 #include "stm32f1xx.h"
 #include <stdint.h>
+#include "../Inc/usb_driver.h"
 
 /*
-    Только не пугайтесь этого огромного кода! Он всего лишь моргает диодом)
-    Если серьезно - эта программа написана без использования даже CMSIS, что и делает её такой громадной 
-    Суть - просто просигнализировать об успешной прошивке
+
+    Тестовая версия USB-загрузчика
+    В будущем лучше выделить некоторые функции в отдельную общую библиотеку для STM32F1
+    Некоторые функции сделать static
+
+    //TIP: PA11 - DM, PA12 - DP
 */
 
-static void enable_port_clock(void);
-static void configure_pin(void);
-static void toggle_pin(void);
+void Set_Clock48MHz()
+{
+    //Включаем HSE - (High Speed External) - внешний кварц на 8МГц в Bluepill
+    RCC->CR |= RCC_CR_HSEON; 
+
+    //Ждем, пока HSE стабилизируется (Присутствует емкость)
+    while(!(RCC->CR & RCC_CR_HSERDY)); 
+
+    //Включаем префетч-буфер. МК будет "угадывать" какие команды будут вызваны, тем самым ускорится доступ к памяти
+    FLASH->ACR |= FLASH_ACR_PRFTBE; 
+    
+    //Задержка в 1 такт при обращении к памяти для частоты >=48МГц
+    FLASH->ACR &= ~FLASH_ACR_LATENCY;
+    FLASH->ACR |= FLASH_ACR_LATENCY_1; 
+
+    //Настройка тактирования шин
+    RCC->CFGR |= RCC_CFGR_HPRE_DIV1;    //AHB  - 48МГц
+    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2;   //APB1 - 24МГц - максимум 36МГц
+    RCC->CFGR |= RCC_CFGR_PPRE2_DIV1;   //APB2 - 48МГц
+    
+    //Конфигурируем умножитель частоты PLL (HSE*6 = 8*6 = 48МГц)
+    RCC->CFGR |= RCC_CFGR_PLLSRC;
+    RCC->CFGR &= ~RCC_CFGR_PLLMULL;
+    RCC->CFGR |= RCC_CFGR_PLLMULL6;
+
+    //Включаем умножитель частоты PLL
+    RCC->CR |= RCC_CR_PLLON;
+    while(!(RCC->CR & RCC_CR_PLLRDY));
+    
+    //Устанавливаем PLL как источник тактирования
+    RCC->CFGR &= ~RCC_CFGR_SW;
+    RCC->CFGR |= RCC_CFGR_SW_PLL;
+    while((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SW_PLL);
+}
 
 int main(void)
 {
-    enable_port_clock();
-    configure_pin();
+    Set_Clock48MHz();
+    USB_Init();
 
-    for (;;)
-    {
-        for (uint32_t delay = 500000; delay > 0; delay--)
-        {
-        }
+    while(1);
 
-        toggle_pin();
-    }
     return 0;
-}
-
-static void enable_port_clock(void)
-{
-    uint32_t rcc_base_address = 0x40021000;
-    uint32_t rcc_apb2enr_address = rcc_base_address + 0x18;
-    uint32_t rcc_apb2enr_iopcen = 1 << 4;
-
-    uint32_t *rcc_apb2enr_pointer = (uint32_t *)rcc_apb2enr_address;
-    uint32_t rcc_apb2enr_value = *rcc_apb2enr_pointer;
-    rcc_apb2enr_value |= rcc_apb2enr_iopcen;
-    *rcc_apb2enr_pointer = rcc_apb2enr_value;
-}
-
-static void configure_pin(void)
-{
-    uint32_t gpioc_base_address = 0x40011000;
-    uint32_t gpioc_crh_address = gpioc_base_address + 0x04;
-    uint32_t gpiox_crh_mode13_0 = 1 << 20;
-    uint32_t gpiox_crh_mode13_1 = 1 << 21;
-    uint32_t gpiox_crh_cnf13_0 = 1 << 22;
-    uint32_t gpiox_crh_cnf13_1 = 1 << 23;
-
-    uint32_t *gpioc_crh_pointer = (uint32_t *)gpioc_crh_address;
-    uint32_t gpioc_crh_value = *gpioc_crh_pointer;
-    gpioc_crh_value &= ~gpiox_crh_mode13_0;
-    gpioc_crh_value |= gpiox_crh_mode13_1;
-    gpioc_crh_value |= gpiox_crh_cnf13_0;
-    gpioc_crh_value &= ~gpiox_crh_cnf13_1;
-    *gpioc_crh_pointer = gpioc_crh_value;
-}
-
-static void toggle_pin(void)
-{
-    uint32_t gpioc_base_address = 0x40011000;
-    uint32_t gpioc_odr_address = gpioc_base_address + 0x0c;
-    uint32_t gpiox_odr_odr13 = 1 << 13;
-
-    uint32_t *gpioc_odr_pointer = (uint32_t *)gpioc_odr_address;
-    uint32_t gpioc_odr_value = *gpioc_odr_pointer;
-    gpioc_odr_value ^= gpiox_odr_odr13;
-    *gpioc_odr_pointer = gpioc_odr_value;
 }

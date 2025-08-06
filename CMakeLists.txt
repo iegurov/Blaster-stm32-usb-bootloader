@@ -11,7 +11,8 @@ set(LD_SCRIPT ${CMAKE_SOURCE_DIR}/Drivers/CMSIS/Device/gcc/STM32F103.ld)
 
 set(
     SOURCES 
-    src/main.c
+    Src/main.c
+    Src/usb_driver.c
     Drivers/CMSIS/Device/system_stm32f1xx.c
     Drivers/CMSIS/Device/gcc/startup_stm32f103xb.s
 )
@@ -25,12 +26,14 @@ target_include_directories(
     ${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/Drivers/CMSIS/Core
     ${CMAKE_SOURCE_DIR}/Drivers/CMSIS/Device/Includes
+    ${CMAKE_SOURCE_DIR}/Inc
 )
 
 target_link_directories(
     ${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/Drivers/CMSIS/Core
     ${CMAKE_SOURCE_DIR}/Drivers/CMSIS/Device/Includes
+    ${CMAKE_SOURCE_DIR}/Inc
 )
 
 target_compile_definitions(
